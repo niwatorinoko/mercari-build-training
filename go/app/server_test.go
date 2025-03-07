@@ -2,11 +2,13 @@ package app
 
 import (
 	"bytes"
+	"database/sql"
 	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -439,120 +441,215 @@ func TestAddItem(t *testing.T) {
 }
 
 // STEP 6-4: uncomment this test
-// func TestAddItemE2e(t *testing.T) {
-// 	if testing.Short() {
-// 		t.Skip("skipping e2e test")
-// 	}
+func TestAddItemE2e(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test")
+	}
 
-// 	db, closers, err := setupDB(t)
-// 	if err != nil {
-// 		t.Fatalf("failed to set up database: %v", err)
-// 	}
-// 	t.Cleanup(func() {
-// 		for _, c := range closers {
-// 			c()
-// 		}
-// 	})
+	db, closers, err := setupDB(t)
+	if err != nil {
+		t.Fatalf("failed to set up database: %v", err)
+	}
+	t.Cleanup(func() {
+		for _, c := range closers {
+			c()
+		}
+	})
 
-// 	type wants struct {
-// 		code int
-// 	}
-// 	cases := map[string]struct {
-// 		args map[string]string
-// 		wants
-// 	}{
-// 		"ok: correctly inserted": {
-// 			args: map[string]string{
-// 				"name":     "used iPhone 16e",
-// 				"category": "phone",
-// 			},
-// 			wants: wants{
-// 				code: http.StatusOK,
-// 			},
-// 		},
-// 		"ng: failed to insert": {
-// 			args: map[string]string{
-// 				"name":     "",
-// 				"category": "phone",
-// 			},
-// 			wants: wants{
-// 				code: http.StatusBadRequest,
-// 			},
-// 		},
-// 	}
+	// Create temporary directory for image files
+	tempDir, err := os.MkdirTemp("", "test-images-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
 
-// 	for name, tt := range cases {
-// 		t.Run(name, func(t *testing.T) {
-// 			h := &Handlers{itemRepo: &itemRepository{db: db}}
+	// Prepare dummy image data
+	dummyImageData := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46} // JPEG header
 
-// 			values := url.Values{}
-// 			for k, v := range tt.args {
-// 				values.Set(k, v)
-// 			}
-// 			req := httptest.NewRequest("POST", "/items", strings.NewReader(values.Encode()))
-// 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	type wants struct {
+		code int
+		// Add database check expectations
+		shouldExistInDB bool
+	}
 
-// 			rr := httptest.NewRecorder()
-// 			h.AddItem(rr, req)
+	cases := map[string]struct {
+		args map[string]string
+		wants
+	}{
+		"ok: correctly inserted": {
+			args: map[string]string{
+				"name":     "used iPhone 16e",
+				"category": "phone",
+			},
+			wants: wants{
+				code:            http.StatusOK,
+				shouldExistInDB: true,
+			},
+		},
+		"ng: failed to insert": {
+			args: map[string]string{
+				"name":     "",
+				"category": "phone",
+			},
+			wants: wants{
+				code:            http.StatusBadRequest,
+				shouldExistInDB: false,
+			},
+		},
+	}
 
-// 			// check response
-// 			if tt.wants.code != rr.Code {
-// 				t.Errorf("expected status code %d, got %d", tt.wants.code, rr.Code)
-// 			}
-// 			if tt.wants.code >= 400 {
-// 				return
-// 			}
-// 			for _, v := range tt.args {
-// 				if !strings.Contains(rr.Body.String(), v) {
-// 					t.Errorf("response body does not contain %s, got: %s", v, rr.Body.String())
-// 				}
-// 			}
+	for name, tt := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Setup the handler with the temp directory
+			h := &Handlers{
+				itemRepo:   &itemRepository{db: db},
+				imgDirPath: tempDir,
+			}
 
-// 			// STEP 6-4: check inserted data
-// 		})
-// 	}
-// }
+			// Create a multipart form request with image
+			body := &bytes.Buffer{}
+			writer := multipart.NewWriter(body)
 
-// func setupDB(t *testing.T) (db *sql.DB, closers []func(), e error) {
-// 	t.Helper()
+			// Add form fields
+			for k, v := range tt.args {
+				err := writer.WriteField(k, v)
+				if err != nil {
+					t.Fatalf("failed to write field: %v", err)
+				}
+			}
 
-// 	defer func() {
-// 		if e != nil {
-// 			for _, c := range closers {
-// 				c()
-// 			}
-// 		}
-// 	}()
+			// Add image file
+			part, err := writer.CreateFormFile("image", "test.jpg")
+			if err != nil {
+				t.Fatalf("failed to create form file: %v", err)
+			}
+			_, err = part.Write(dummyImageData)
+			if err != nil {
+				t.Fatalf("failed to write image data: %v", err)
+			}
 
-// 	// create a temporary file for e2e testing
-// 	f, err := os.CreateTemp(".", "*.sqlite3")
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
-// 	closers = append(closers, func() {
-// 		f.Close()
-// 		os.Remove(f.Name())
-// 	})
+			err = writer.Close()
+			if err != nil {
+				t.Fatalf("failed to close writer: %v", err)
+			}
 
-// 	// set up tables
-// 	db, err = sql.Open("sqlite3", f.Name())
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
-// 	closers = append(closers, func() {
-// 		db.Close()
-// 	})
+			// Create the request with proper multipart form content type
+			req := httptest.NewRequest("POST", "/items", body)
+			req.Header.Set("Content-Type", writer.FormDataContentType())
 
-// 	// TODO: replace it with real SQL statements.
-// 	cmd := `CREATE TABLE IF NOT EXISTS items (
-// 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-// 		name VARCHAR(255),
-// 		category VARCHAR(255)
-// 	)`
-// 	_, err = db.Exec(cmd)
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
+			rr := httptest.NewRecorder()
+			h.AddItem(rr, req)
 
-// 	return db, closers, nil
-// }
+			// Check response status code
+			if tt.wants.code != rr.Code {
+				t.Errorf("expected status code %d, got %d", tt.wants.code, rr.Code)
+			}
+
+			// Skip further checks if we expect an error
+			if tt.wants.code >= 400 {
+				return
+			}
+
+			// Check if the response contains the item name (don't check for category in response)
+			if !strings.Contains(rr.Body.String(), tt.args["name"]) {
+				t.Errorf("response body does not contain item name %s, got: %s", tt.args["name"], rr.Body.String())
+			}
+
+			// STEP 6-4: check inserted data
+			if tt.wants.shouldExistInDB {
+				// Check category was inserted
+				var categoryID int
+				var categoryName string
+				err := db.QueryRow("SELECT id, name FROM categories WHERE name = ?", tt.args["category"]).Scan(&categoryID, &categoryName)
+				if err != nil {
+					t.Errorf("failed to find category in database: %v", err)
+					return
+				}
+
+				if categoryName != tt.args["category"] {
+					t.Errorf("expected category name %s, got %s", tt.args["category"], categoryName)
+				}
+
+				// Check item was inserted with correct category_id
+				var itemName string
+				var itemCategoryID int
+				var imageName string
+
+				err = db.QueryRow("SELECT name, category_id, image_name FROM items WHERE name = ?", tt.args["name"]).Scan(&itemName, &itemCategoryID, &imageName)
+				if err != nil {
+					t.Errorf("failed to find item in database: %v", err)
+					return
+				}
+
+				if itemName != tt.args["name"] {
+					t.Errorf("expected item name %s, got %s", tt.args["name"], itemName)
+				}
+
+				if itemCategoryID != categoryID {
+					t.Errorf("expected category_id %d, got %d", categoryID, itemCategoryID)
+				}
+
+				if imageName == "" {
+					t.Errorf("expected non-empty image_name, got empty string")
+				}
+
+				// Check if image file exists in the temporary directory
+				if _, err := os.Stat(filepath.Join(tempDir, imageName)); os.IsNotExist(err) {
+					t.Errorf("image file %s does not exist in directory %s", imageName, tempDir)
+				}
+			}
+		})
+	}
+}
+
+func setupDB(t *testing.T) (db *sql.DB, closers []func(), e error) {
+	t.Helper()
+
+	defer func() {
+		if e != nil {
+			for _, c := range closers {
+				c()
+			}
+		}
+	}()
+
+	// create a temporary file for e2e testing
+	f, err := os.CreateTemp(".", "*.sqlite3")
+	if err != nil {
+		return nil, nil, err
+	}
+	closers = append(closers, func() {
+		f.Close()
+		os.Remove(f.Name())
+	})
+
+	// set up tables
+	db, err = sql.Open("sqlite3", f.Name())
+	if err != nil {
+		return nil, nil, err
+	}
+	closers = append(closers, func() {
+		db.Close()
+	})
+
+	// TODO: replace it with real SQL statements.
+	cmd := `
+	CREATE TABLE IF NOT EXISTS categories (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name VARCHAR(255) NOT NULL
+			);
+			CREATE TABLE IF NOT EXISTS items (
+				id INTEGER PRIMARY KEY,
+				name VARCHAR(255) NOT NULL,
+				category_id INTEGER,
+				image_name VARCHAR(255) NOT NULL,
+				FOREIGN KEY (category_id) REFERENCES categories(id)
+			);
+		`
+	_, err = db.Exec(cmd)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return db, closers, nil
+}
