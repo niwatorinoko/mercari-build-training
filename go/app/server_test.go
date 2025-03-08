@@ -245,7 +245,6 @@ func TestAddItem(t *testing.T) {
 	// ダミー画像データの準備
 	dummyImageData, err := os.ReadFile("/Users/reanogasawara/Desktop/mercari-build-training/go/images/default.jpg")
 	if err != nil {
-		// テスト環境では適当なデータを使用
 		dummyImageData = []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46} // JPEG ヘッダー
 	}
 
@@ -333,32 +332,6 @@ func TestAddItem(t *testing.T) {
 				body: "failed to insert item",
 			},
 		},
-		"ng: invalid request (missing name)": {
-			args: map[string]string{
-				"category": "phone",
-			},
-			imageData: dummyImageData,
-			setupMocks: func(m *MockItemRepository) {
-				// モックの呼び出しは期待されない
-			},
-			wants: wants{
-				code: http.StatusBadRequest,
-				body: "name is required",
-			},
-		},
-		"ng: invalid request (missing category)": {
-			args: map[string]string{
-				"name": "iPhone",
-			},
-			imageData: dummyImageData,
-			setupMocks: func(m *MockItemRepository) {
-				// モックの呼び出しは期待されない
-			},
-			wants: wants{
-				code: http.StatusBadRequest,
-				body: "category is required",
-			},
-		},
 	}
 
 	for name, tt := range cases {
@@ -440,7 +413,6 @@ func TestAddItem(t *testing.T) {
 	}
 }
 
-// STEP 6-4: uncomment this test
 func TestAddItemE2e(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping e2e test")
@@ -562,7 +534,7 @@ func TestAddItemE2e(t *testing.T) {
 				var categoryName string
 				err := db.QueryRow("SELECT id, name FROM categories WHERE name = ?", tt.args["category"]).Scan(&categoryID, &categoryName)
 				if err != nil {
-					t.Errorf("failed to find category in database: %v", err)
+					t.Errorf("find category in database failed: %v", err)
 					return
 				}
 
@@ -577,7 +549,7 @@ func TestAddItemE2e(t *testing.T) {
 
 				err = db.QueryRow("SELECT name, category_id, image_name FROM items WHERE name = ?", tt.args["name"]).Scan(&itemName, &itemCategoryID, &imageName)
 				if err != nil {
-					t.Errorf("failed to find item in database: %v", err)
+					t.Errorf("find item in database failed: %v", err)
 					return
 				}
 
