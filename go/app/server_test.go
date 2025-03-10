@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"errors"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -25,10 +26,10 @@ func TestParseAddItemRequest(t *testing.T) {
 		err bool
 	}
 
-	// 画像データを実際のファイルから読み込む
-	dummyImageData, err := os.ReadFile("/Users/reanogasawara/Desktop/mercari-build-training/go/images/default.jpg")
+	// ダミー画像データの準備
+	dummyImageData, err := loadTestImage()
 	if err != nil {
-		t.Fatalf("failed to read image file: %v", err)
+		t.Fatalf("failed to load test image: %v", err)
 	}
 
 	emptyImageData := []byte{}
@@ -45,7 +46,6 @@ func TestParseAddItemRequest(t *testing.T) {
 			args: map[string]string{
 				"name":     "jacket",
 				"category": "fashion",
-				"image":    "default.jpg",
 			},
 			imageData: dummyImageData,
 			wants: wants{
@@ -68,7 +68,6 @@ func TestParseAddItemRequest(t *testing.T) {
 		"ng: missing name": {
 			args: map[string]string{
 				"category": "fashion",
-				"image":    "default.jpg",
 			},
 			imageData: dummyImageData,
 			wants: wants{
@@ -78,8 +77,7 @@ func TestParseAddItemRequest(t *testing.T) {
 		},
 		"ng: missing category": {
 			args: map[string]string{
-				"name":  "jacket",
-				"image": "default.jpg",
+				"name": "jacket",
 			},
 			imageData: dummyImageData,
 			wants: wants{
@@ -102,7 +100,6 @@ func TestParseAddItemRequest(t *testing.T) {
 			args: map[string]string{
 				"name":     "jacket",
 				"category": "fashion",
-				"image":    "default.jpg",
 			},
 			imageData: emptyImageData,
 			wants: wants{
@@ -114,7 +111,6 @@ func TestParseAddItemRequest(t *testing.T) {
 			args: map[string]string{
 				"name":     "jacket",
 				"category": "fashion",
-				"image":    "default.jpg",
 			},
 			imageData: []byte("this is not an image"), // テキストデータを画像として送信
 			wants: wants{
@@ -126,7 +122,6 @@ func TestParseAddItemRequest(t *testing.T) {
 			args: map[string]string{
 				"name":     longString,
 				"category": "fashion",
-				"image":    "default.jpg",
 			},
 			imageData: dummyImageData,
 			wants: wants{
@@ -138,7 +133,6 @@ func TestParseAddItemRequest(t *testing.T) {
 			args: map[string]string{
 				"name":     "jacket",
 				"category": longString,
-				"image":    "default.jpg",
 			},
 			imageData: dummyImageData,
 			wants: wants{
@@ -156,15 +150,21 @@ func TestParseAddItemRequest(t *testing.T) {
 			body := &bytes.Buffer{}
 			writer := multipart.NewWriter(body)
 
-			// フォームデータを追加
+			// フォームデータを追加 (画像以外)
 			for key, value := range tt.args {
 				_ = writer.WriteField(key, value)
 			}
 
-			// 画像を送信する場合
-			if _, exists := tt.args["image"]; exists {
-				part, _ := writer.CreateFormFile("image", "default.jpg")
-				part.Write(tt.imageData)
+			// 画像データを送信する場合
+			if tt.imageData != nil {
+				part, err := writer.CreateFormFile("image", "default.jpg")
+				if err != nil {
+					t.Fatalf("failed to create form file: %v", err)
+				}
+				_, err = part.Write(tt.imageData)
+				if err != nil {
+					t.Fatalf("failed to write image data: %v", err)
+				}
 			}
 
 			writer.Close()
@@ -179,26 +179,34 @@ func TestParseAddItemRequest(t *testing.T) {
 			// execute test target
 			got, err := parseAddItemRequest(req)
 
-			// confirm the result
+			// エラーの期待値と実際のエラーを比較
 			if err != nil {
 				if !tt.wants.err {
 					t.Errorf("unexpected error: %v", err)
 				}
 				return
 			}
-			if tt.wants.err && err == nil {
+			if tt.wants.err {
 				t.Errorf("expected error but got nil")
 				return
 			}
 
 			// `Image` フィールドの比較を無視して `cmp.Diff` で比較
+			// -> 画像データは意図しない差分が出る場合があるため
 			if diff := cmp.Diff(tt.wants.req, got, cmpopts.IgnoreFields(AddItemRequest{}, "Image")); diff != "" {
 				t.Errorf("unexpected request (-want +got):\n%s", diff)
 			}
 
-			// 画像データのサイズをチェック
-			if len(got.Image) != len(tt.wants.req.Image) {
-				t.Errorf("image size mismatch: got %d, want %d", len(got.Image), len(tt.wants.req.Image))
+			// 画像データの内容を厳密に比較
+			if !bytes.Equal(got.Image, tt.wants.req.Image) {
+				t.Errorf("image data mismatch")
+			}
+
+			// MIMEタイプのバリデーション（JPEG/PNG であることを確認）
+			contentType := http.DetectContentType(got.Image[:512])
+			validMimeTypes := map[string]bool{"image/jpeg": true, "image/png": true}
+			if _, valid := validMimeTypes[contentType]; !valid {
+				t.Errorf("invalid image format: got %s, expected JPEG or PNG", contentType)
 			}
 		})
 	}
@@ -243,9 +251,9 @@ func TestAddItem(t *testing.T) {
 	t.Parallel()
 
 	// ダミー画像データの準備
-	dummyImageData, err := os.ReadFile("/Users/reanogasawara/Desktop/mercari-build-training/go/images/default.jpg")
+	dummyImageData, err := loadTestImage()
 	if err != nil {
-		dummyImageData = []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46} // JPEG ヘッダー
+		t.Fatalf("failed to load test image: %v", err)
 	}
 
 	type wants struct {
@@ -624,4 +632,39 @@ func setupDB(t *testing.T) (db *sql.DB, closers []func(), e error) {
 	}
 
 	return db, closers, nil
+}
+
+// **テスト用の画像を読み込む**
+func loadTestImage() ([]byte, error) {
+	// カレントディレクトリ取得
+	_, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("カレントディレクトリを取得できません: %v", err)
+	}
+
+	// テストデータのディレクトリは `go/testdata/` に配置しているので、プロジェクトルートのパスを取得
+	rootPath, err := filepath.Abs("../")
+	if err != nil {
+		return nil, fmt.Errorf("プロジェクトルートのパスを取得できません: %v", err)
+	}
+
+	// `testdata/default.jpg` の絶対パスを構築
+	imagePath := filepath.Join(rootPath, "testdata", "default.jpg")
+
+	// ファイルの存在をチェック
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("画像ファイルが見つかりません: %s", imagePath)
+	}
+
+	// 画像を読み込む
+	dummyImageData, err := os.ReadFile(imagePath)
+	if err != nil {
+		return nil, fmt.Errorf("画像ファイルを読み込めません: %v", err)
+	}
+
+	// 画像が空でないかチェック
+	if len(dummyImageData) == 0 {
+		return nil, fmt.Errorf("画像データが空です: %s", imagePath)
+	}
+	return dummyImageData, nil
 }
