@@ -119,34 +119,50 @@ func parseAddItemRequest(r *http.Request) (*AddItemRequest, error) {
 		Category: r.FormValue("category"),
 	}
 
-	file, _, err := r.FormFile("image")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get image: %w", err)
-	}
-
-	// Read the image file only if it exists
-	if file != nil {
-		defer file.Close()
-		imageData, err := io.ReadAll(file)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read image file: %w", err)
-		}
-		req.Image = imageData
-	}
-
-	// validate the request
 	if req.Name == "" {
 		return nil, errors.New("name is required")
+	}
+	if len(req.Name) > 255 {
+		return nil, errors.New("name is too long (max 255 chars)")
 	}
 
 	if req.Category == "" {
 		return nil, errors.New("category is required")
 	}
-
-	if len(req.Image) == 0 {
-		return nil, errors.New("image is required")
+	if len(req.Category) > 255 {
+		return nil, errors.New("category is too long (max 255 chars)")
 	}
 
+	// 画像ファイルの取得
+	file, _, err := r.FormFile("image")
+	if err != nil {
+		return nil, errors.New("image is required")
+	}
+	defer file.Close()
+
+	// 画像のバイナリデータを読み込む
+	imageData, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read image file: %w", err)
+	}
+
+	// **空の画像データのチェック**
+	if len(imageData) == 0 {
+		return nil, errors.New("image file is empty")
+	}
+
+	// **MIMEタイプを `http.DetectContentType` で取得**
+	contentType := http.DetectContentType(imageData[:512]) // 最初の 512 バイトから MIME を判定
+	validMimeTypes := map[string]bool{
+		"image/jpeg": true,
+		"image/png":  true,
+	}
+
+	if !validMimeTypes[contentType] {
+		return nil, fmt.Errorf("invalid image format (must be JPEG or PNG, got %s)", contentType)
+	}
+
+	req.Image = imageData
 	return req, nil
 }
 
@@ -278,9 +294,11 @@ func (s *Handlers) storeImage(image []byte) (filePath string, err error) {
 	hashSum := hasher.Sum(nil)
 	fileName := fmt.Sprintf("%x.jpg", hashSum)
 
+	// Build the full file path
+	filePath = filepath.Join(s.imgDirPath, fileName)
+
 	// Check if the image already exists
-	GetImageRequest := &GetImageRequest{FileName: fileName}
-	_, err = s.buildImagePath(GetImageRequest.FileName)
+	_, err = os.Stat(filePath)
 	if err == nil {
 		// Image already exists, return the filename
 		return fileName, nil
