@@ -25,5 +25,5 @@ RUN go build -o server cmd/api/main.go
 
 USER trainee
 
-# `go run` ではなく `./server` を実行
-CMD ["./server"]
+# --- 追加: データベースのマイグレーションを実行 ---
+CMD ["sh", "-c", "./server migrate up && ./server"]
