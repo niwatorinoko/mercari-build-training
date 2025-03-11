@@ -29,27 +29,28 @@ export const ItemList = ({ reload, onLoadCompleted }: Prop) => {
   }, [reload, onLoadCompleted]);
 
   return (
-<div>
+    <div className="ItemList">
       {items?.map((item) => {
         const imageUrl = item.image_name
           ? `http://localhost:9000/images/${item.image_name}`
           : PLACEHOLDER_IMAGE;
 
         return (
-          <div key={item.id} className="ItemList">
+          <p key={item.id} className="ItemCard">
             <img 
               src={imageUrl} 
               alt={item.name} 
+              className="ItemImage"
               onError={(e) => {
                 e.currentTarget.src = PLACEHOLDER_IMAGE;
               }} 
             />
-            <p>
-              <span>Name: {item.name}</span>
+            <p className="ItemInfo">
+              <span className="ItemName">{item.name}</span>
               <br />
-              <span>Category: {item.category_name}</span>
+              <span className='ItemCategory'>Category: {item.category_name}</span>
             </p>
-          </div>
+          </p>
         );
       })}
     </div>
