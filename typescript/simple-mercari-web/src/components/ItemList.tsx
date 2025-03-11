@@ -29,20 +29,29 @@ export const ItemList = ({ reload, onLoadCompleted }: Prop) => {
   }, [reload, onLoadCompleted]);
 
   return (
-    <div>
+<div>
       {items?.map((item) => {
+        const imageUrl = item.image_name
+          ? `http://localhost:9000/images/${item.image_name}`
+          : PLACEHOLDER_IMAGE;
+
         return (
           <div key={item.id} className="ItemList">
-            {/* TODO: Task 2: Show item images */}
-            <img src={PLACEHOLDER_IMAGE} />
+            <img 
+              src={imageUrl} 
+              alt={item.name} 
+              onError={(e) => {
+                e.currentTarget.src = PLACEHOLDER_IMAGE;
+              }} 
+            />
             <p>
               <span>Name: {item.name}</span>
               <br />
-              <span>Category: {item.category}</span>
+              <span>Category: {item.category_name}</span>
             </p>
           </div>
         );
       })}
     </div>
-  );
+  );  
 };
