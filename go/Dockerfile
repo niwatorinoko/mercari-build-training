@@ -25,5 +25,7 @@ RUN go build -o server cmd/api/main.go
 
 USER trainee
 
+EXPOSE 9000
+
 # `go run` ではなく `./server` を実行
 CMD ["./server"]

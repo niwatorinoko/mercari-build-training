@@ -1,42 +1,115 @@
 .App {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  background-color: black;
 }
 
 .Title {
-  background-color: #222427;
-  min-height: 8vh;
+  background-color: #0e7400;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: left;
   font-size: calc(10px + 1vmin);
   color: white;
+}
+
+.ListingForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 500px;
+  margin: 20px auto;
+}
+
+.InputField {
+  padding: 10px;
+  margin: 5px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  width: auto;
+}
+
+.SubmitButton {
+  background-color: #0e7400;
+  color: white;
+  font-size: 1rem;
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.SubmitButton:hover {
+  background-color: #201c1c7d;
 }
 
 .Listing {
-  background-color: #222427;
-  min-height: 8vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: left;
-  font-size: calc(10px + 1vmin);
-  color: white;
+  background-color: #f5f5f5;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 500px;
+  margin: 20px auto;
 }
 
 .ItemList {
-  background-color: #222427;
-  min-height: 8vh;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 50px;
+  padding: 16px;
+  justify-content: center;
   align-items: center;
-  justify-content: left;
-  font-size: calc(10px + 1vmin);
-  color: white;
+  width: 90vw;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.App-link {
-  color: #61dafb;
+.ItemCard {
+  background-color: #fff;
+  border-radius: 5px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  text-align: center;
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
+}
+
+
+.ItemCard:hover {
+  transform: scale(1.05);
+}
+
+.ItemImage {
+  width: 100%;
+  height: 200px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.ItemInfo {
+  margin-top: 8px;
+}
+
+.ItemName {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.ItemCategory {
+  font-size: 1rem;
+  color: #666;
 }
 
 @keyframes App-logo-spin {
