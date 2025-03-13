@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Item, fetchItems } from '~/api';
 
 const PLACEHOLDER_IMAGE = import.meta.env.VITE_FRONTEND_URL + '/logo192.png';
+const SERVER_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:9000';
 
 interface Prop {
   reload: boolean;
@@ -29,20 +30,30 @@ export const ItemList = ({ reload, onLoadCompleted }: Prop) => {
   }, [reload, onLoadCompleted]);
 
   return (
-    <div>
+    <div className="ItemList">
       {items?.map((item) => {
+        const imageUrl = item.image_name
+          ? `${SERVER_URL}/images/${item.image_name}`
+          : PLACEHOLDER_IMAGE;
+
         return (
-          <div key={item.id} className="ItemList">
-            {/* TODO: Task 2: Show item images */}
-            <img src={PLACEHOLDER_IMAGE} />
-            <p>
-              <span>Name: {item.name}</span>
+          <p key={item.id} className="ItemCard">
+            <img 
+              src={imageUrl} 
+              alt={item.name} 
+              className="ItemImage"
+              onError={(e) => {
+                e.currentTarget.src = PLACEHOLDER_IMAGE;
+              }} 
+            />
+            <p className="ItemInfo">
+              <span className="ItemName">{item.name}</span>
               <br />
-              <span>Category: {item.category}</span>
+              <span className='ItemCategory'>Category: {item.category_name}</span>
             </p>
-          </div>
+          </p>
         );
       })}
     </div>
-  );
+  );  
 };

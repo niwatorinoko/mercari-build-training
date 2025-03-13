@@ -3,7 +3,8 @@ const SERVER_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:9000';
 export interface Item {
   id: number;
   name: string;
-  category: string;
+  category_id: number;
+  category_name: string;
   image_name: string;
 }
 
