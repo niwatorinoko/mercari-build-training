@@ -51,3 +51,19 @@ export const postItem = async (input: CreateItemInput): Promise<Response> => {
 
   return response;
 };
+
+export const fetchSearchItems = async (keyword: string): Promise<ItemListResponse> => {
+  const response = await fetch(`${SERVER_URL}/search?keyword=${encodeURIComponent(keyword)}`, {
+    method: 'GET',
+    mode: 'cors',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+  });
+
+  if (response.status >= 400) {
+    throw new Error('Failed to fetch search results from the server');
+  }
+  return response.json();
+};
