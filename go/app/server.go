@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -251,9 +252,15 @@ func (s *Handlers) GetItemByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 数字以外の文字を含む場合はエラーにする
+	if _, err := strconv.Atoi(idStr); err != nil {
+		slog.Error("invalid id format", "id", idStr, "error", err)
+		http.Error(w, "invalid id format (expected integer)", http.StatusBadRequest)
+		return
+	}
+
 	// 文字列をintに変換
-	var id int
-	_, err := fmt.Sscanf(idStr, "%d", &id)
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		slog.Error("invalid id format", "error", err)
 		http.Error(w, "invalid id format", http.StatusBadRequest)

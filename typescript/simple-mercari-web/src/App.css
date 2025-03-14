@@ -112,11 +112,52 @@
   color: #666;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+/* SearchBar Style */
+.SearchBar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.SearchBar input {
+  width: 300px;
+  padding: 10px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.SearchBar button {
+  background-color: #0e7400;
+  color: white;
+  font-size: 1rem;
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+.SearchBar button:hover {
+  background-color: #065a00;
+}
+
+@media (max-width: 768px) {
+  .ItemList {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
   }
-  to {
-    transform: rotate(360deg);
+}
+
+@media (max-width: 1024px) {
+  .ItemList {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
   }
+}
+
+.ItemCard:hover {
+  transform: scale(1.03);
 }
