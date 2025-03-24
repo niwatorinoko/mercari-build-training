@@ -70,7 +70,7 @@ export const ItemList = ({ reload, onLoadCompleted }: Prop) => {
               <p className="ItemInfo">
                 <span className="ItemName">{item.name}</span>
                 <br />
-                <span className='ItemCategory'>Category: {item.category_name}</span>
+                <span className='ItemCategory'>Category: {item.category}</span>
               </p>
             </p>
           );
