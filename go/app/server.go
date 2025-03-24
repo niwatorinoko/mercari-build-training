@@ -221,6 +221,13 @@ func (s *Handlers) AddItem(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type ItemResponse struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	Category  string `json:"category"`
+	ImageName string `json:"image_name"`
+}
+
 // GetItems ハンドラー: 登録された商品の一覧を取得
 func (s *Handlers) GetItems(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -232,9 +239,19 @@ func (s *Handlers) GetItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := map[string][]Item{"items": items}
+	var responses []ItemResponse
+	for _, item := range items {
+		resp := ItemResponse{
+			ID:        item.ID,
+			Name:      item.Name,
+			Category:  item.CategoryName,
+			ImageName: item.ImageName,
+		}
+		responses = append(responses, resp)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(response)
+	err = json.NewEncoder(w).Encode(map[string][]ItemResponse{"items": responses})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -245,25 +262,17 @@ func (s *Handlers) GetItems(w http.ResponseWriter, r *http.Request) {
 func (s *Handlers) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// 1. リクエストデータの取得（IDの取得とパース）
+	// 1. IDの取得と検証
 	idStr := r.PathValue("id")
 	if idStr == "" {
 		http.Error(w, "id is required", http.StatusBadRequest)
 		return
 	}
 
-	// 数字以外の文字を含む場合はエラーにする
-	if _, err := strconv.Atoi(idStr); err != nil {
-		slog.Error("invalid id format", "id", idStr, "error", err)
-		http.Error(w, "invalid id format (expected integer)", http.StatusBadRequest)
-		return
-	}
-
-	// 文字列をintに変換
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		slog.Error("invalid id format", "error", err)
-		http.Error(w, "invalid id format", http.StatusBadRequest)
+		slog.Error("invalid id format", "id", idStr, "error", err)
+		http.Error(w, "invalid id format (expected integer)", http.StatusBadRequest)
 		return
 	}
 
@@ -275,10 +284,17 @@ func (s *Handlers) GetItemByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. レスポンスを返す
+	// 3. レスポンスを整形
+	resp := ItemResponse{
+		ID:        item.ID,
+		Name:      item.Name,
+		Category:  item.CategoryName,
+		ImageName: item.ImageName,
+	}
+
+	// 4. JSONで返却
 	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(item)
-	if err != nil {
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		slog.Error("failed to encode response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
